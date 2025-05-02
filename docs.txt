@@ -1,0 +1,11 @@
+Dưới đây là cách tách main.dart thành các module riêng biệt để dễ dàng chỉnh sửa, đặc biệt là _predictWithModel(). Tôi sẽ chia thành các file chính:
+
+main.dart – Khởi chạy ứng dụng, giữ MyApp
+
+city_list_screen.dart – Màn hình danh sách thành phố
+
+forecast_screen.dart – Màn hình hiển thị dự báo thời tiết
+
+prediction_service.dart – Xử lý logic dự đoán thời tiết với _predictWithModel()
+
+chart_widget.dart – Widget biểu đồ dự báo thời tiết
