@@ -25,9 +25,11 @@
 * В assets/fine_tune: model_info хранит информацию о нормализации, model keras — это модель, сохраненная в формате keras для целей тонкой настройки модели, modelzz — это модель, сохраненная в формате tflite (flutter поддерживает только этот формат)
 
 ## Результат
-Главная страница приложения, включая поиск и местоположение
+* Главная страница приложения, включая поиск и местоположение:
+
 ![image](https://github.com/user-attachments/assets/ba37bbba-1cf3-4676-a085-58319e2f01dd)
 
-Графики и прогнозы
+* Графики и прогнозы:
+
 ![image](https://github.com/user-attachments/assets/547ad14e-e5c7-4b58-b9d5-ce9f25e742b4)
 ![image](https://github.com/user-attachments/assets/a52f4656-7e2e-41a9-8d7f-b6090c743621)
