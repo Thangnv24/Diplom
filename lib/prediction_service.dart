@@ -12,7 +12,8 @@ Future<Map<String, List<double>>> predictWeather(String cityName) async {
   final int daysToPredict = 7;
 
   try {
-    final DateTime lastDataDate = DateTime(2025, 3, 8); // Ngày dữ liệu cuối cùng
+    // Last data date / Последняя дата данных
+    final DateTime lastDataDate = DateTime(2025, 3, 8);
     final DateTime now = DateTime.now();
 
     final int dayOffset = now.difference(lastDataDate).inDays;
@@ -35,22 +36,22 @@ Future<Map<String, List<double>>> predictWeather(String cityName) async {
           final input = [[adjustedDay]];
           final output = [[0.0]];
 
-          // Predict
+          // Predict / Прогнозировать
           interpreter.run(input, output);
 
-          print('Day ${i} (thực tế là ngày +$adjustedDay từ dữ liệu): Input=$input, Output=$output');
+          print('Day $i (actual day +$adjustedDay from data): Input=$input, Output=$output');
           predictions.add(output[0][0]);
         }
 
-        // Save
+        // Save / Сохранить
         final outputKey = paramMapping[param] ?? param.split('_')[0];
         results[outputKey] = predictions;
 
         interpreter.close();
       } catch (e) {
-        print('Lỗi khi xử lý tham số $param: $e');
+        print('Error processing parameter $param: $e');
 
-        // Đưa vào dữ liệu mặc định (0.0) khi có lỗi
+        // Insert default data (0.0) on error / Вставить данные по умолчанию при ошибке
         final outputKey = paramMapping[param] ?? param.split('_')[0];
         results[outputKey] = List.generate(daysToPredict, (index) => 0.0);
       }
@@ -58,7 +59,7 @@ Future<Map<String, List<double>>> predictWeather(String cityName) async {
 
     return results;
   } catch (e) {
-    print('Lỗi tổng thể khi dự đoán thời tiết: $e');
+    print('General error in weather prediction: $e');
     return {
       'temperature': List.generate(daysToPredict, (index) => 0.0),
       'humidity': List.generate(daysToPredict, (index) => 0.0),

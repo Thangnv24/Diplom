@@ -19,36 +19,28 @@ class _CityListScreenState extends State<CityListScreen> {
   List<String> filteredCities = [];
   String? nearestCity;
   bool isLoadingLocation = false;
-
-  // Map các thành phố với tọa độ của chúng
-  final Map<String, List<double>> cityCoordinates = {
-    "Hanoi": [21.0285, 105.8544],
-    "Moscow": [55.7558, 37.6173],
-    "Saint Petersburg": [59.9343, 30.3351],
-    "Paris": [48.8566, 2.3522],
-    "London": [51.5074, -0.1278],
-    "New York": [40.7128, -74.0060],
-    "Beijing": [39.9042, 116.4074],
-    "Rome": [41.9028, 12.4964],
-    "Tokyo": [35.6895, 139.6917],
-    "Shanghai": [31.2304, 121.4737],
-    "Los Angeles": [34.0522, -118.2437],
-    "Dubai": [25.276987, 55.296249],
-    "Mumbai": [19.0760, 72.8777],
-    "Ho Chi Minh City": [10.8231, 106.6297],
-    "Berlin": [52.5200, 13.4050],
-    "Sydney": [-33.8688, 151.2093],
-    "Cairo": [30.0444, 31.2357],
-    "Toronto": [43.6532, -79.3832],
-    "Seoul": [37.5665, 126.9780],
-    "Singapore": [1.3521, 103.8198],
-  };
+  Map<String, List<double>> cityCoordinates = {};
 
   @override
   void initState() {
     super.initState();
-    _loadCities();
-    _getCurrentLocation();
+    _loadCityCoordinates().then((_) {
+      _loadCities();
+      _getCurrentLocation();
+    });
+  }
+
+  // Load city coordinates from JSON file
+  // Загрузка координат городов из JSON-файла
+  Future<void> _loadCityCoordinates() async {
+  final jsonString = await rootBundle.loadString('assets/city_coords.json');
+  final Map<String, dynamic> jsonMap = json.decode(jsonString);
+
+  setState(() {
+    cityCoordinates = jsonMap.map((key, value) {
+      return MapEntry(key, List<double>.from(value));
+    });
+  });
   }
 
   Future<void> _loadCities() async {
@@ -80,9 +72,10 @@ class _CityListScreenState extends State<CityListScreen> {
     });
   }
 
-  // Hàm tính khoảng cách giữa hai tọa độ (Haversine formula)
+  // Calculate distance between two coordinates (Haversine formula)
+  // Расчёт расстояния между двумя координатами (формула гаверсинусов)
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const int earthRadius = 6371; // Đơn vị km
+    const int earthRadius = 6371; // km / км
     final double dLat = _degreesToRadians(lat2 - lat1);
     final double dLon = _degreesToRadians(lon2 - lon1);
 
@@ -98,14 +91,16 @@ class _CityListScreenState extends State<CityListScreen> {
     return degrees * (pi / 180);
   }
 
-  // Hàm xác định thành phố gần nhất dựa vào vị trí hiện tại
+  // Determine nearest city based on current location
+  // Определение ближайшего города на основе текущего местоположения
   Future<void> _getCurrentLocation() async {
     setState(() {
       isLoadingLocation = true;
     });
 
     try {
-      // Kiểm tra quyền truy cập vị trí
+      // Check location permission
+      // Проверить разрешение на доступ к местоположению
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -117,12 +112,14 @@ class _CityListScreenState extends State<CityListScreen> {
         }
       }
 
-      // Lấy vị trí hiện tại
+      // Get current position
+      // Получить текущее местоположение
       Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high
       );
 
-      // Tìm thành phố gần nhất
+      // Find nearest city
+      // Найти ближайший город
       String closest = "";
       double minDistance = double.infinity;
 
@@ -160,7 +157,8 @@ class _CityListScreenState extends State<CityListScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
         children: [
-          // Hiển thị thành phố gần nhất
+          // Display nearest city
+          // Отобразить ближайший город
           if (nearestCity != null || isLoadingLocation)
             Container(
               padding: const EdgeInsets.all(16.0),
@@ -171,9 +169,9 @@ class _CityListScreenState extends State<CityListScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: isLoadingLocation
-                        ? const Text('Locating you...')
+                        ? const Text('Locating you...') // Идёт определение местоположения...
                         : Text(
-                      'Location: $nearestCity',
+                      'Location: $nearestCity', // Местоположение: $nearestCity
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -187,12 +185,12 @@ class _CityListScreenState extends State<CityListScreen> {
                           ),
                         );
                       },
-                      child: const Text('Watch'),
+                      child: const Text('Watch'), // Смотреть
                     ),
                   IconButton(
                     icon: const Icon(Icons.refresh),
                     onPressed: _getCurrentLocation,
-                    tooltip: 'Refresh position',
+                    tooltip: 'Refresh position', // Обновить местоположение
                   ),
                 ],
               ),
@@ -202,7 +200,7 @@ class _CityListScreenState extends State<CityListScreen> {
             child: TextField(
               controller: searchController,
               decoration: const InputDecoration(
-                labelText: 'Search Cities',
+                labelText: 'Search Cities', // Поиск городов
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),

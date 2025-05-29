@@ -32,12 +32,14 @@ class _ForecastScreenState extends State<ForecastScreen> {
 
     try {
       final now = DateTime.now();
-      // Định dạng ngày tháng với khoảng cách giữa ngày và tháng
+      // Format date with space between day and month
+      // Форматировать дату с пробелом между днем и месяцем
       dateLabels = List.generate(
           7, (index) => DateFormat('dd/MM').format(now.add(Duration(days: index))));
 
-      // Gọi hàm dự đoán từ TFLite model
-      final predictions = await predictWeather(widget.cityName);
+          // Call prediction function from TFLite model
+          // Вызвать функцию прогнозирования из модели TFLite
+          final predictions = await predictWeather(widget.cityName);
 
       setState(() {
         temperatureData = predictions['temperature'] ?? [];
@@ -46,67 +48,31 @@ class _ForecastScreenState extends State<ForecastScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print('Lỗi khi tải dự báo: $e');
+      print('Forecast loading error: $e');
       setState(() {
         isLoading = false;
       });
 
-      // Hiển thị thông báo lỗi cho người dùng nếu cần
+      // Show error message to user if needed
+      // При необходимости показать сообщение об ошибке пользователю
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể tải dự báo thời tiết. Vui lòng thử lại sau.')),
+        SnackBar(content: Text('Failed to load weather forecast. Please try again later.')),
       );
     }
   }
-  // Future<void> _loadForecast() async {
-  //   final now = DateTime.now();
-  //   // Định dạng ngày tháng với khoảng cách giữa ngày và tháng
-  //   dateLabels = List.generate(
-  //       7, (index) => DateFormat('dd/MM').format(now.add(Duration(days: index))));
-  //   final predictions = await predictWeather(widget.cityName);
-  //   setState(() {
-  //     temperatureData = predictions['temperature']!;
-  //     humidityData = predictions['humidity']!;
-  //     windSpeedData = predictions['wind_speed']!;
-  //     isLoading = false;
-  //   });
-  // }
-
-  // Widget _buildForecastTable() {
-  //   // Bọc DataTable trong SingleChildScrollView theo chiều ngang để tránh lỗi overflow.
-  //   return SingleChildScrollView(
-  //     scrollDirection: Axis.horizontal,
-  //     child: DataTable(
-  //       columns: const [
-  //         DataColumn(label: Text('Date')),
-  //         DataColumn(label: Text('Temp (°C)')),
-  //         DataColumn(label: Text('Humidity (%)')),
-  //         DataColumn(label: Text('Wind (km/h)')),
-  //       ],
-  //       rows: List.generate(
-  //         7,
-  //             (index) => DataRow(cells: [
-  //           DataCell(Text(dateLabels[index])),
-  //           DataCell(Text(temperatureData[index].toStringAsFixed(4))),
-  //           DataCell(Text(humidityData[index].toStringAsFixed(4))),
-  //           DataCell(Text(windSpeedData[index].toStringAsFixed(4))),
-  //         ]),
-  //       ),
-  //     ),
-  //   );
-  // }
   Widget _buildForecastTable() {
-    // Xác định số lượng dòng thực tế cần hiển thị, lấy giá trị nhỏ nhất giữa 7
-    // và độ dài của các danh sách dữ liệu.
-    // dateLabels được đảm bảo có 7 phần tử trong _loadForecast.
+    // Determine actual number of rows to display, take min between 7 and data length
+    // Определить фактическое количество отображаемых строк, взять минимум между 7 и длиной данных
     final int actualRowCount = min(7, min(temperatureData.length, min(humidityData.length, windSpeedData.length)));
 
     if (actualRowCount == 0 && !isLoading) {
-      // Xử lý trường hợp không có dữ liệu sau khi tải
-      return const Center(child: Text('Không có dữ liệu dự báo.', style: TextStyle(fontSize: 16)));
+      // Handle case of no data after loading
+      // Обработать случай отсутствия данных после загрузки
+      return const Center(child: Text('No forecast data available.', style: TextStyle(fontSize: 16)));
     }
 
-
-    // Bọc DataTable trong SingleChildScrollView theo chiều ngang để tránh lỗi overflow.
+    // Wrap DataTable in horizontal SingleChildScrollView to avoid overflow
+    // Обернуть DataTable в горизонтальный SingleChildScrollView для предотвращения переполнения
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
@@ -116,14 +82,15 @@ class _ForecastScreenState extends State<ForecastScreen> {
           DataColumn(label: Text('Humidity (%)')),
           DataColumn(label: Text('Wind (km/h)')),
         ],
-        // Sử dụng actualRowCount thay vì cố định 7
         rows: List.generate(
           actualRowCount,
               (index) => DataRow(cells: [
             DataCell(Text(dateLabels[index])),
-            DataCell(Text(temperatureData[index].toStringAsFixed(2))), // Có thể giảm số thập phân
-            DataCell(Text(humidityData[index].toStringAsFixed(2))),   // Có thể giảm số thập phân
-            DataCell(Text(windSpeedData[index].toStringAsFixed(2))),    // Có thể giảm số thập phân
+            // Can reduce decimal places
+            // Можно уменьшить количество знаков после запятой
+            DataCell(Text(temperatureData[index].toStringAsFixed(2))),
+            DataCell(Text(humidityData[index].toStringAsFixed(2))),
+            DataCell(Text(windSpeedData[index].toStringAsFixed(2))),
           ]),
         ),
       ),
@@ -150,7 +117,6 @@ class _ForecastScreenState extends State<ForecastScreen> {
             const Text('Temperature (°C)',
                 style:
                 TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            // Thay đổi ChartWidget để hiển thị đồ thị tối ưu
             OptimizedChartWidget(
                 data: temperatureData,
                 color: Colors.red,
@@ -178,7 +144,6 @@ class _ForecastScreenState extends State<ForecastScreen> {
   }
 }
 
-// Tạo lớp mới cho chart widget được tối ưu
 class OptimizedChartWidget extends StatelessWidget {
   final List<double> data;
   final Color color;
@@ -193,8 +158,8 @@ class OptimizedChartWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Tính toán chiều rộng tối thiểu cần thiết cho biểu đồ
-    // Đảm bảo thêm khoảng trống bên phải đủ cho giá trị cuối cùng
+    // Calculate minimum required width for chart
+    // Рассчитать минимальную необходимую ширину для диаграммы
     final screenWidth = MediaQuery.of(context).size.width;
     final minChartWidth = max(screenWidth - 32, 600);
 
@@ -221,12 +186,15 @@ class OptimizedChartWidget extends StatelessWidget {
         ],
       ),
       margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.only(top: 20), // Bỏ padding bên phải ở container chứa
+      // Remove right padding in container
+      // Убрать правый отступ в контейнере
+      padding: const EdgeInsets.only(top: 20),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Container(
-          // Thêm padding bên phải để đảm bảo giá trị cuối cùng hiển thị đầy đủ
-          width: minChartWidth + 60, // Thêm 60px cho biên phải
+          // Add right padding to ensure last value displays fully
+          // Добавить правый отступ для полного отображения последнего значения
+          width: minChartWidth + 60,
           padding: const EdgeInsets.only(left: 20, right: 60, bottom: 10),
           child: CustomPaint(
             size: Size(minChartWidth, 200),
@@ -242,7 +210,6 @@ class OptimizedChartWidget extends StatelessWidget {
   }
 }
 
-// Tạo lớp vẽ đồ thị được tối ưu
 class OptimizedChartPainter extends CustomPainter {
   final List<double> data;
   final Color color;
@@ -260,16 +227,17 @@ class OptimizedChartPainter extends CustomPainter {
 
     final double width = size.width;
     final double height = size.height;
-    final double chartHeight = height - 40; // Để lại khoảng cách cho nhãn
+    final double chartHeight = height - 40;
 
-    // Vẽ background grid lines
+    // Draw background grid lines
+    // Нарисовать линии сетки фона
     _drawGridLines(canvas, width, chartHeight);
 
-    // Tìm giá trị min và max
     double minValue = data.reduce((a, b) => a < b ? a : b);
     double maxValue = data.reduce((a, b) => a > b ? a : b);
 
-    // Đảm bảo có khoảng cách trên và dưới
+    // Ensure top/bottom padding
+    // Обеспечить отступы сверху/снизу
     double padding = (maxValue - minValue) * 0.15;
     maxValue += padding;
     minValue -= padding;
@@ -277,7 +245,6 @@ class OptimizedChartPainter extends CustomPainter {
 
     final double dataRange = maxValue - minValue;
 
-    // Vẽ đường đồ thị
     final Paint linePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -297,13 +264,14 @@ class OptimizedChartPainter extends CustomPainter {
       fontWeight: FontWeight.w500,
     );
 
-    // Các điểm trên đồ thị
+    // Graph points
+    // Точки графика
     Path linePath = Path();
     Path fillPath = Path();
     bool first = true;
 
-    // Điều chỉnh khoảng cách giữa các điểm để tránh chồng chéo và đảm bảo không gian bên phải
-    // Chừa không gian bên phải bằng cách chỉ sử dụng tối đa 90% chiều rộng cho các điểm
+    // Adjust point spacing to avoid overlap and ensure right space
+    // Настроить расстояние между точками для предотвращения наложения
     final double actualWidth = width * 0.90;
     final double pointSpacing = actualWidth / (data.length - 1);
 
@@ -322,11 +290,13 @@ class OptimizedChartPainter extends CustomPainter {
         fillPath.lineTo(x, y);
       }
 
-      // Vẽ điểm với hiệu ứng glow
+      // Draw point with glow effect
+      // Нарисовать точку с эффектом свечения
       canvas.drawCircle(Offset(x, y), 6, Paint()..color = color.withOpacity(0.3));
       canvas.drawCircle(Offset(x, y), 4, pointPaint);
 
-      // Vẽ giá trị của điểm
+      // Draw point value
+      // Нарисовать значение точки
       final TextSpan valueSpan = TextSpan(
         text: data[i].toStringAsFixed(4),
         style: labelStyle,
@@ -338,7 +308,8 @@ class OptimizedChartPainter extends CustomPainter {
       );
       valuePainter.layout();
 
-      // Vẽ background cho text
+      // Draw text background
+      // Нарисовать фон текста
       final Rect textRect = Rect.fromCenter(
         center: Offset(x, y - 20),
         width: valuePainter.width + 8,
@@ -354,7 +325,8 @@ class OptimizedChartPainter extends CustomPainter {
           Offset(x - valuePainter.width / 2, y - 22)
       );
 
-      // Vẽ nhãn ngày
+      // Draw date label
+      // Нарисовать метку даты
       final TextSpan dateSpan = TextSpan(
         text: labels[i],
         style: labelStyle,
@@ -371,14 +343,17 @@ class OptimizedChartPainter extends CustomPainter {
       );
     }
 
-    // Hoàn thành đường fill path
+    // Complete fill path
+    // Завершить путь заливки
     fillPath.lineTo((data.length - 1) * pointSpacing, chartHeight);
     fillPath.close();
 
-    // Vẽ area fill trước
+    // Draw area fill first
+    // Сначала нарисовать заливку области
     canvas.drawPath(fillPath, shadowPaint);
 
-    // Vẽ đường kết nối các điểm sau
+    // Draw connecting line afterwards
+    // Затем нарисовать соединительную линию
     canvas.drawPath(linePath, linePaint);
   }
 
@@ -387,13 +362,15 @@ class OptimizedChartPainter extends CustomPainter {
       ..color = Colors.grey.withOpacity(0.2)
       ..strokeWidth = 1.0;
 
-    // Vẽ đường ngang
+    // Draw horizontal lines
+    // Нарисовать горизонтальные линии
     for (int i = 1; i < 5; i++) {
       final double y = height / 4 * i;
       canvas.drawLine(Offset(0, y), Offset(width, y), gridPaint);
     }
 
-    // Vẽ đường dọc
+    // Draw vertical lines
+    // Нарисовать вертикальные линии
     for (int i = 0; i < data.length; i++) {
       final double x = i * width / (data.length - 1);
       canvas.drawLine(Offset(x, 0), Offset(x, height), gridPaint);
@@ -404,7 +381,6 @@ class OptimizedChartPainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
 
-// Hàm hỗ trợ
 double max(double a, double b) {
   return a > b ? a : b;
 }
