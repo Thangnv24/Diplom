@@ -7,7 +7,7 @@ import json
 def get_weather_history(lat, lon, start_year=2020, end_year=2025):
     base_url = "https://archive-api.open-meteo.com/v1/archive"
 
-    today = f"2025-03-08" #datetime.today().strftime("%Y-%m-%d")
+    today = f"2025-05-29" #datetime.today().strftime("%Y-%m-%d")
     dfs = []
 
     for year in range(start_year, end_year + 1):
@@ -51,19 +51,3 @@ for city in city_coords:
     time.sleep(0.2)
     weather_data.to_csv(f"or_cities/{city}.csv", index=False)
 
-
-class SinLayer(layers.Layer):
-    def __init__(self):
-        super(SinLayer, self).__init__()
-
-    def build(self, _):
-        self.kernel = self.add_weight(name="kernel", shape=(number_of_sinuses, 3), trainable=True)
-        self.bias = self.add_weight(name="bias", shape=(), trainable=True)
-
-    def call(self, inputs):
-        result = 0
-        for i in range(number_of_sinuses):
-            result += self.kernel[i][0] * tf.sin(
-                self.kernel[i][1] * inputs + self.kernel[i][2]
-            )
-        return result + self.bias

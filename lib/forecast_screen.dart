@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'prediction_service.dart';
 import 'dart:ui' as ui;
 import 'dart:math';
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:convert';
 
 class ForecastScreen extends StatefulWidget {
   final String cityName;
@@ -14,15 +16,68 @@ class ForecastScreen extends StatefulWidget {
 
 class _ForecastScreenState extends State<ForecastScreen> {
   bool isLoading = true;
+  bool isLoadingACF = false;
   List<double> temperatureData = [];
   List<double> humidityData = [];
   List<double> windSpeedData = [];
   List<String> dateLabels = [];
 
+  // ACF data
+  List<double> acfData = [];
+  String selectedParameter = 'temperature';
+  bool showACF = false;
+
+  // Historical data for ACF calculation
+  List<double> historicalTemperatureData = [];
+  List<double> historicalHumidityData = [];
+  List<double> historicalWindSpeedData = [];
+
   @override
   void initState() {
     super.initState();
     _loadForecast();
+    _loadHistoricalData();
+  }
+
+  Future<void> _loadHistoricalData() async {
+    try {
+      // Load historical data from CSV file
+      // Use city name directly as filename
+      String fileName = widget.cityName;
+      String csvData = await rootBundle.loadString('assets/or_cities/$fileName.csv');
+
+      List<String> lines = csvData.split('\n');
+
+      // Skip header line (date,temperature_avg,humidity_avg,wind_speed_max)
+      for (int i = 1; i < lines.length; i++) {
+        if (lines[i].trim().isEmpty) continue;
+
+        List<String> values = lines[i].split(',');
+        if (values.length >= 4) {
+          // CSV format: date, temperature_avg, humidity_avg, wind_speed_max
+          historicalTemperatureData.add(double.tryParse(values[1]) ?? 0.0);
+          historicalHumidityData.add(double.tryParse(values[2]) ?? 0.0);
+          historicalWindSpeedData.add(double.tryParse(values[3]) ?? 0.0);
+        }
+      }
+
+      print('Loaded historical data for ${widget.cityName}:');
+      print('Temperature records: ${historicalTemperatureData.length}');
+      print('Humidity records: ${historicalHumidityData.length}');
+      print('Wind speed records: ${historicalWindSpeedData.length}');
+
+    } catch (e) {
+      print('Error loading historical data: $e');
+      // Show error message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load historical data for ${widget.cityName}. ACF analysis will not be available.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadForecast() async {
@@ -37,9 +92,9 @@ class _ForecastScreenState extends State<ForecastScreen> {
       dateLabels = List.generate(
           7, (index) => DateFormat('dd/MM').format(now.add(Duration(days: index))));
 
-          // Call prediction function from TFLite model
-          // Вызвать функцию прогнозирования из модели TFLite
-          final predictions = await predictWeather(widget.cityName);
+      // Call prediction function from TFLite model
+      // Вызвать функцию прогнозирования из модели TFLite
+      final predictions = await predictWeather(widget.cityName);
 
       setState(() {
         temperatureData = predictions['temperature'] ?? [];
@@ -60,6 +115,195 @@ class _ForecastScreenState extends State<ForecastScreen> {
       );
     }
   }
+
+  Future<void> _generateACF() async {
+    setState(() {
+      isLoadingACF = true;
+    });
+
+    try {
+      List<double> dataForACF;
+
+      switch (selectedParameter) {
+        case 'temperature':
+          dataForACF = historicalTemperatureData;
+          break;
+        case 'humidity':
+          dataForACF = historicalHumidityData;
+          break;
+        case 'wind_speed':
+          dataForACF = historicalWindSpeedData;
+          break;
+        default:
+          dataForACF = historicalTemperatureData;
+      }
+
+      if (dataForACF.isEmpty) {
+        throw Exception('No historical data available for ${selectedParameter.replaceAll('_', ' ')}. Please ensure the CSV file for ${widget.cityName} exists in assets/or_cities/');
+      }
+
+      if (dataForACF.length < 10) {
+        throw Exception('Insufficient data points (${dataForACF.length}) for ACF calculation. At least 10 data points are required.');
+      }
+
+      if (dataForACF.isNotEmpty) {
+        // Limit lags to reasonable number based on data size
+        int maxLags = min(40, (dataForACF.length / 4).floor());
+        // maxLags = max(10, maxLags); // Ensure minimum 10 lags
+
+        acfData = _calculateACF(dataForACF, maxLags);
+        setState(() {
+          showACF = true;
+          isLoadingACF = false;
+        });
+      } else {
+        throw Exception('No historical data available for ACF calculation');
+      }
+    } catch (e) {
+      print('Error generating ACF: $e');
+      setState(() {
+        isLoadingACF = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to generate ACF plot. Please try again.')),
+      );
+    }
+  }
+
+  List<double> _calculateACF(List<double> data, int maxLags) {
+    if (data.length <= maxLags) {
+      maxLags = data.length - 1;
+    }
+
+    List<double> acf = [];
+    double mean = data.reduce((a, b) => a + b) / data.length;
+
+    // Calculate variance (lag 0)
+    double variance = 0;
+    for (double value in data) {
+      variance += pow(value - mean, 2);
+    }
+    variance /= data.length;
+
+    // Calculate ACF for each lag
+    for (int lag = 0; lag <= maxLags; lag++) {
+      double covariance = 0;
+      int count = data.length - lag;
+
+      for (int i = 0; i < count; i++) {
+        covariance += (data[i] - mean) * (data[i + lag] - mean);
+      }
+      covariance /= data.length;
+
+      double correlation = variance > 0 ? covariance / variance : 0;
+      acf.add(correlation);
+    }
+
+    return acf;
+  }
+
+  Widget _buildACFParameterSelector() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ACF Analysis',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Select parameter for AutoCorrelation Function analysis:',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: selectedParameter,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'temperature', child: Text('Temperature Avg (°C)')),
+              DropdownMenuItem(value: 'humidity', child: Text('Humidity Avg (%)')),
+              DropdownMenuItem(value: 'wind_speed', child: Text('Wind Speed Max (km/h)')),
+            ],
+            onChanged: (String? value) {
+              if (value != null) {
+                setState(() {
+                  selectedParameter = value;
+                  showACF = false; // Hide previous ACF plot
+                });
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: isLoadingACF ? null : _generateACF,
+              icon: isLoadingACF
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.analytics),
+              label: Text(isLoadingACF ? 'Generating...' : 'Generate ACF Plot'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getParameterDisplayName(String parameter) {
+    switch (parameter) {
+      case 'temperature':
+        return 'TEMPERATURE AVG (°C)';
+      case 'humidity':
+        return 'HUMIDITY AVG (%)';
+      case 'wind_speed':
+        return 'WIND SPEED MAX (km/h)';
+      default:
+        return parameter.toUpperCase();
+    }
+  }
+
+  Widget _buildACFChart() {
+    if (!showACF || acfData.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ACF Plot - ${_getParameterDisplayName(selectedParameter)}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          ACFChartWidget(
+            data: acfData,
+            parameter: selectedParameter,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildForecastTable() {
     // Determine actual number of rows to display, take min between 7 and data length
     // Определить фактическое количество отображаемых строк, взять минимум между 7 и длиной данных
@@ -114,6 +358,14 @@ class _ForecastScreenState extends State<ForecastScreen> {
             const SizedBox(height: 10),
             _buildForecastTable(),
             const SizedBox(height: 20),
+
+            // ACF Parameter Selector
+            _buildACFParameterSelector(),
+
+            // ACF Chart
+            _buildACFChart(),
+
+            const SizedBox(height: 20),
             const Text('Temperature (°C)',
                 style:
                 TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -142,6 +394,202 @@ class _ForecastScreenState extends State<ForecastScreen> {
       ),
     );
   }
+}
+
+class ACFChartWidget extends StatelessWidget {
+  final List<double> data;
+  final String parameter;
+
+  const ACFChartWidget({
+    Key? key,
+    required this.data,
+    required this.parameter,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final minChartWidth = max(screenWidth - 32, 600);
+
+    return Container(
+      height: 300,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.blue.shade50,
+            Colors.white,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(top: 20),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Container(
+          width: minChartWidth + 60,
+          padding: const EdgeInsets.only(left: 20, right: 60, bottom: 10),
+          child: CustomPaint(
+            size: Size(minChartWidth, 260),
+            painter: ACFChartPainter(data: data, parameter: parameter),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class ACFChartPainter extends CustomPainter {
+  final List<double> data;
+  final String parameter;
+
+  ACFChartPainter({required this.data, required this.parameter});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
+    final double width = size.width * 0.6;
+    final double height = size.height;
+    final double chartHeight = height - 80;
+    final double chartTop = 40;
+
+    // Draw confidence bands (±1.96/sqrt(n) for 95% confidence)
+    double confidenceLevel = 1.96 / sqrt(data.length);
+
+    final Paint confidencePaint = Paint()
+      ..color = Colors.red.withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+
+    // Draw confidence lines (chỉ vẽ đường, không vẽ vùng)
+    double confLineY1 = chartTop + chartHeight * (1 - confidenceLevel) / 2;
+    double confLineY2 = chartTop + chartHeight * (1 + confidenceLevel) / 2;
+
+    canvas.drawLine(Offset(0, confLineY1), Offset(width, confLineY1), confidencePaint);
+    canvas.drawLine(Offset(0, confLineY2), Offset(width, confLineY2), confidencePaint);
+
+    // Draw zero line
+    final Paint zeroLinePaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    double zeroY = chartTop + chartHeight / 2;
+    canvas.drawLine(Offset(0, zeroY), Offset(width, zeroY), zeroLinePaint);
+
+    // Draw ACF vertical lines (các cột gần nhau hơn)
+    final Paint linePaint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5; // Làm mỏng hơn
+
+    // Thu gọn khoảng cách giữa các cột
+    final double availableWidth = width * 0.9; // Sử dụng 90% chiều rộng
+    final double barSpacing = availableWidth / data.length;
+    final double startX = width * 0.05; // Bắt đầu từ 5% chiều rộng
+
+    for (int i = 0; i < data.length; i++) {
+      double x = startX + i * barSpacing;
+      double acfValue = data[i];
+
+      // Calculate line endpoints
+      double lineBottom = zeroY;
+      double lineTop = zeroY - (acfValue * chartHeight / 2);
+
+      // Draw vertical line from zero to ACF value
+      canvas.drawLine(
+        Offset(x, lineBottom),
+        Offset(x, lineTop),
+        linePaint,
+      );
+
+      // Draw small circle at the end of each line for better visibility
+      final Paint pointPaint = Paint()
+        ..color = Colors.blue
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(x, lineTop), 1.5, pointPaint);
+
+      // Draw lag labels every 5 lags to avoid overcrowding
+      if (i % 5 == 0 || i == data.length - 1) {
+        final TextSpan lagSpan = TextSpan(
+          text: i.toString(),
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 10,
+          ),
+        );
+        final TextPainter lagPainter = TextPainter(
+          text: lagSpan,
+          textDirection: ui.TextDirection.ltr,
+        );
+        lagPainter.layout();
+        lagPainter.paint(
+          canvas,
+          Offset(x - lagPainter.width / 2, height - 20),
+        );
+      }
+    }
+
+    // Draw Y-axis labels
+    final TextStyle labelStyle = TextStyle(
+      color: Colors.black87,
+      fontSize: 10,
+    );
+
+    for (double val in [-1.0, -0.5, 0.0, 0.5, 1.0]) {
+      double y = chartTop + chartHeight * (1 - val) / 2;
+
+      final TextSpan valueSpan = TextSpan(
+        text: val.toStringAsFixed(1),
+        style: labelStyle,
+      );
+      final TextPainter valuePainter = TextPainter(
+        text: valueSpan,
+        textDirection: ui.TextDirection.ltr,
+      );
+      valuePainter.layout();
+      valuePainter.paint(
+        canvas,
+        Offset(-valuePainter.width - 5, y - valuePainter.height / 2),
+      );
+    }
+
+    // Draw title
+    final TextSpan titleSpan = TextSpan(
+      text: 'Lag',
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+    final TextPainter titlePainter = TextPainter(
+      text: titleSpan,
+      textDirection: ui.TextDirection.ltr,
+    );
+    titlePainter.layout();
+    titlePainter.paint(
+      canvas,
+      Offset(width / 2 - titlePainter.width / 2, height - 10),
+    );
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
 
 class OptimizedChartWidget extends StatelessWidget {

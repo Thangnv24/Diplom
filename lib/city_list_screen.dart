@@ -49,7 +49,7 @@ class _CityListScreenState extends State<CityListScreen> {
       final Map<String, dynamic> manifestMap = json.decode(manifestContent);
 
       final citySet = manifestMap.keys
-          .where((key) => key.startsWith('assets/modelzz/'))
+          .where((key) => key.startsWith('assets/model/'))
           .map((path) => path.split('/').last.split('_').first)
           .toSet();
 

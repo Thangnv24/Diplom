@@ -66,6 +66,7 @@ flutter:
     - assets/model/
     - assets/modelzz/
     - assets/city_coords.json
+    - assets/or_cities/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

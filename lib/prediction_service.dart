@@ -13,7 +13,7 @@ Future<Map<String, List<double>>> predictWeather(String cityName) async {
 
   try {
     // Last data date / Последняя дата данных
-    final DateTime lastDataDate = DateTime(2025, 3, 8);
+    final DateTime lastDataDate = DateTime(2025, 5, 29);
     final DateTime now = DateTime.now();
 
     final int dayOffset = now.difference(lastDataDate).inDays;
@@ -24,7 +24,7 @@ Future<Map<String, List<double>>> predictWeather(String cityName) async {
 
     for (String param in parameters) {
       try {
-        final String modelPath = 'assets/modelzz/${cityName}_${param}.tflite';
+        final String modelPath = 'assets/model/${cityName}_${param}.tflite';
         print('Loading model: $modelPath');
 
         final interpreter = await Interpreter.fromAsset(modelPath);
